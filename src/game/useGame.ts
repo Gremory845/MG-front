@@ -1,0 +1,174 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { submitAttempt } from '../api/endpoints'
+import type { AttemptResult, LevelDetail, NoteAttemptPayload } from '../api/types'
+import { listenForNote } from './listenForNote'
+import type { LiveReading } from './listenForNote'
+import { freqToPitch } from './music'
+import { playScale } from './scalePlayer'
+
+// Máquina de estados del juego (en vez de veinte booleanos).
+export type GamePhase =
+  | 'IDLE'
+  | 'REQUESTING_MIC'
+  | 'PLAYING_SCALE'
+  | 'WAITING_FOR_NOTE'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'MIC_ERROR'
+
+export interface NoteRecord {
+  position: number
+  result: 'HIT' | 'MISS'
+  detectedFrequency?: number
+}
+
+export type Submission =
+  | { status: 'idle' }
+  | { status: 'sending' }
+  | { status: 'done'; data: AttemptResult }
+  | { status: 'error'; message: string }
+
+interface AudioResources {
+  ctx: AudioContext
+  stream: MediaStream
+  analyser: AnalyserNode
+}
+
+function describeMicError(e: unknown): string {
+  if (e instanceof DOMException) {
+    if (e.name === 'NotAllowedError' || e.name === 'SecurityError')
+      return 'Necesitamos permiso para usar tu micrófono. Habilítalo en el candado de la barra de direcciones y vuelve a intentar.'
+    if (e.name === 'NotFoundError' || e.name === 'OverconstrainedError')
+      return 'No encontramos ningún micrófono conectado.'
+    if (e.name === 'NotReadableError') return 'Tu micrófono está siendo usado por otra aplicación.'
+  }
+  return 'No se pudo acceder al micrófono.'
+}
+
+export function useGame(level: LevelDetail | undefined) {
+  const [phase, setPhase] = useState<GamePhase>('IDLE')
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null)
+  const [reading, setReading] = useState<LiveReading | null>(null)
+  const [records, setRecords] = useState<NoteRecord[]>([])
+  const [failedAt, setFailedAt] = useState<number | null>(null)
+  const [micError, setMicError] = useState<string | null>(null)
+  const [submission, setSubmission] = useState<Submission>({ status: 'idle' })
+
+  const audioRef = useRef<AudioResources | null>(null)
+  const runRef = useRef(0) // id del intento en curso; subirlo cancela loops anteriores
+
+  const start = useCallback(async () => {
+    if (!level) return
+    const runId = ++runRef.current
+    const cancelled = () => runRef.current !== runId
+
+    setRecords([])
+    setFailedAt(null)
+    setCurrentIndex(0)
+    setReading(null)
+    setMicError(null)
+    setSubmission({ status: 'idle' })
+
+    // 1) Micrófono + AudioContext (se crean una sola vez, con un clic del usuario)
+    if (!audioRef.current) {
+      setPhase('REQUESTING_MIC')
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        })
+        const ctx = new AudioContext()
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 4096
+        ctx.createMediaStreamSource(stream).connect(analyser)
+        audioRef.current = { ctx, stream, analyser }
+      } catch (e) {
+        setMicError(describeMicError(e))
+        setPhase('MIC_ERROR')
+        return
+      }
+    }
+    const { ctx, analyser } = audioRef.current
+    if (ctx.state === 'suspended') await ctx.resume()
+    if (cancelled()) return
+
+    // 2) Suena la escala
+    setPhase('PLAYING_SCALE')
+    await playScale(ctx, level.notes, setPlayingIndex, cancelled)
+    setPlayingIndex(null)
+    if (cancelled()) return
+
+    // 3) El jugador canta nota por nota
+    const startedAt = performance.now()
+    const done: NoteRecord[] = []
+
+    const finish = async (completed: boolean) => {
+      // Las notas no alcanzadas se reportan como MISS: el backend exige todas las posiciones.
+      const notes: NoteAttemptPayload[] = level.notes.map((n) => {
+        const rec = done.find((r) => r.position === n.position)
+        if (!rec) return { position: n.position, result: 'MISS' }
+        if (rec.detectedFrequency === undefined) return { position: n.position, result: rec.result }
+        const p = freqToPitch(rec.detectedFrequency)
+        return {
+          position: n.position,
+          result: rec.result,
+          detected_frequency: rec.detectedFrequency,
+          detected_pitch_class: p.pitchClass,
+          detected_octave: p.octave,
+        }
+      })
+
+      setSubmission({ status: 'sending' })
+      try {
+        const data = await submitAttempt({
+          level_id: level.id,
+          completed,
+          duration_ms: Math.round(performance.now() - startedAt),
+          notes,
+        })
+        setSubmission({ status: 'done', data })
+      } catch (e) {
+        setSubmission({ status: 'error', message: e instanceof Error ? e.message : 'No se pudo guardar el intento' })
+      }
+    }
+
+    for (let i = 0; i < level.notes.length; i++) {
+      setCurrentIndex(i)
+      setPhase('WAITING_FOR_NOTE')
+      setReading(null)
+
+      const outcome = await listenForNote(analyser, ctx.sampleRate, level.notes[i], cancelled, setReading)
+      if (cancelled()) return
+
+      done.push({ position: level.notes[i].position, result: outcome.result, detectedFrequency: outcome.freq })
+      setRecords([...done])
+
+      if (outcome.result === 'MISS') {
+        setReading(null)
+        setFailedAt(i)
+        setPhase('FAILED')
+        await finish(false)
+        return
+      }
+    }
+
+    setReading(null)
+    setPhase('COMPLETED')
+    await finish(true)
+  }, [level])
+
+  // Limpieza al salir de la pantalla: cancela loops y libera micrófono/audio.
+  useEffect(() => {
+    return () => {
+      runRef.current++
+      const res = audioRef.current
+      if (res) {
+        res.stream.getTracks().forEach((t) => t.stop())
+        void res.ctx.close()
+        audioRef.current = null
+      }
+    }
+  }, [])
+
+  return { phase, currentIndex, playingIndex, reading, records, failedAt, micError, submission, start }
+}
