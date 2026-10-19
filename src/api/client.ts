@@ -7,7 +7,11 @@
 // "single-flight": si varias peticiones fallan a la vez con 401, todas
 // comparten UNA sola llamada a /auth/refresh.
 
-const BASE = '/api'
+
+const BASE = import.meta.env.DEV
+  ? '/api'
+  : (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+
 const REFRESH_KEY = 'mg_refresh_token'
 
 let accessToken: string | null = null
