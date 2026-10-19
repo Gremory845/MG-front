@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { submitAttempt } from '../api/endpoints'
 import type { AttemptResult, LevelDetail, NoteAttemptPayload } from '../api/types'
 import { listenForNote } from './listenForNote'
-import type { LiveReading } from './listenForNote'
+import type { MeterHandle } from './listenForNote'
 import { freqToPitch } from './music'
 import { playScale } from './scalePlayer'
 
@@ -49,7 +49,7 @@ export function useGame(level: LevelDetail | undefined) {
   const [phase, setPhase] = useState<GamePhase>('IDLE')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [playingIndex, setPlayingIndex] = useState<number | null>(null)
-  const [reading, setReading] = useState<LiveReading | null>(null)
+  const meterRef = useRef<MeterHandle>(null) // el medidor se actualiza sin pasar por el estado de React
   const [records, setRecords] = useState<NoteRecord[]>([])
   const [failedAt, setFailedAt] = useState<number | null>(null)
   const [micError, setMicError] = useState<string | null>(null)
@@ -66,7 +66,7 @@ export function useGame(level: LevelDetail | undefined) {
     setRecords([])
     setFailedAt(null)
     setCurrentIndex(0)
-    setReading(null)
+    meterRef.current?.update(null)
     setMicError(null)
     setSubmission({ status: 'idle' })
 
@@ -75,12 +75,27 @@ export function useGame(level: LevelDetail | undefined) {
       setPhase('REQUESTING_MIC')
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+          audio: {
+            channelCount: 1,
+            echoCancellation: false, // no suena nada mientras escuchamos, no hace falta
+            noiseSuppression: true, // reducción de ruido del navegador (carros, motos, ventiladores)
+            autoGainControl: false, // mantiene el volumen real, sin amplificar el ruido de fondo
+          },
         })
         const ctx = new AudioContext()
         const analyser = ctx.createAnalyser()
-        analyser.fftSize = 4096
-        ctx.createMediaStreamSource(stream).connect(analyser)
+        analyser.fftSize = 2048 // ventana de ~43 ms (antes 85 ms): la afinación responde el doble de rápido
+
+        // Filtro pasa-banda a la voz: corta el retumbar de motores (<90 Hz) y el siseo agudo (>1800 Hz)
+        const highpass = ctx.createBiquadFilter()
+        highpass.type = 'highpass'
+        highpass.frequency.value = 90
+        highpass.Q.value = 0.7
+        const lowpass = ctx.createBiquadFilter()
+        lowpass.type = 'lowpass'
+        lowpass.frequency.value = 1800
+        lowpass.Q.value = 0.7
+        ctx.createMediaStreamSource(stream).connect(highpass).connect(lowpass).connect(analyser)
         audioRef.current = { ctx, stream, analyser }
       } catch (e) {
         setMicError(describeMicError(e))
@@ -135,16 +150,16 @@ export function useGame(level: LevelDetail | undefined) {
     for (let i = 0; i < level.notes.length; i++) {
       setCurrentIndex(i)
       setPhase('WAITING_FOR_NOTE')
-      setReading(null)
+      meterRef.current?.update(null)
 
-      const outcome = await listenForNote(analyser, ctx.sampleRate, level.notes[i], cancelled, setReading)
+      const outcome = await listenForNote(analyser, ctx.sampleRate, level.notes[i], cancelled, (r) => meterRef.current?.update(r))
       if (cancelled()) return
 
       done.push({ position: level.notes[i].position, result: outcome.result, detectedFrequency: outcome.freq })
       setRecords([...done])
 
       if (outcome.result === 'MISS') {
-        setReading(null)
+        meterRef.current?.update(null)
         setFailedAt(i)
         setPhase('FAILED')
         await finish(false)
@@ -152,7 +167,7 @@ export function useGame(level: LevelDetail | undefined) {
       }
     }
 
-    setReading(null)
+    meterRef.current?.update(null)
     setPhase('COMPLETED')
     await finish(true)
   }, [level])
@@ -170,5 +185,5 @@ export function useGame(level: LevelDetail | undefined) {
     }
   }, [])
 
-  return { phase, currentIndex, playingIndex, reading, records, failedAt, micError, submission, start }
+  return { phase, currentIndex, playingIndex, meterRef, records, failedAt, micError, submission, start }
 }

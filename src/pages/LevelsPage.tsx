@@ -1,5 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { getScaleLevels } from '../api/endpoints'
+import Breadcrumb from '../components/Breadcrumb'
+import { CATEGORY_INFO, FAMILY_INFO, toParam } from '../catalog'
 import { useAsync } from '../hooks/useAsync'
 
 export default function LevelsPage() {
@@ -8,9 +10,18 @@ export default function LevelsPage() {
 
   return (
     <section>
-      <Link to="/" className="muted">
-        ← Escalas
-      </Link>
+      {data ? (
+        <Breadcrumb
+          items={[
+            { label: 'Escalas', to: '/' },
+            { label: CATEGORY_INFO[data.category].short, to: `/c/${toParam(data.category)}` },
+            { label: FAMILY_INFO[data.family].label, to: `/c/${toParam(data.category)}/${toParam(data.family)}` },
+            { label: data.scale_name },
+          ]}
+        />
+      ) : (
+        <Breadcrumb items={[{ label: 'Escalas', to: '/' }]} />
+      )}
       <h1>{data?.scale_name ?? 'Niveles'}</h1>
       {loading && <p className="muted">Cargando…</p>}
       {error && <p className="error">{error}</p>}

@@ -1,7 +1,12 @@
+export type Category = 'MAJOR' | 'MINOR'
+export type Family = 'NATURAL' | 'HARMONIC' | 'MELODIC'
+
 export interface Scale {
   id: string
   name: string
   difficulty: number
+  category: Category
+  family: Family
 }
 
 export interface LevelSummary {
@@ -14,6 +19,8 @@ export interface LevelSummary {
 export interface ScaleLevels {
   scale_id: string
   scale_name: string
+  category: Category
+  family: Family
   levels: LevelSummary[]
 }
 

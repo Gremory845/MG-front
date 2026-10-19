@@ -52,7 +52,7 @@ export default function GamePage() {
             <p className="big">
               Canta: <strong>{target.note_name}</strong>
             </p>
-            <PitchMeter reading={game.reading} tolerance={target.tolerance_cents} />
+            <PitchMeter ref={game.meterRef} tolerance={target.tolerance_cents} />
           </>
         )}
 
@@ -68,7 +68,7 @@ export default function GamePage() {
         {finished && (
           <>
             {game.phase === 'COMPLETED' ? (
-              <p className="big success">🎉 ¡Nivel completado!</p>
+              <p className="big success">¡Nivel completado!</p>
             ) : (
               <p className="big error">
                 Fallaste en la nota {game.failedAt !== null ? level.notes[game.failedAt].note_name : ''}

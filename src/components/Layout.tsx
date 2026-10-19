@@ -8,7 +8,7 @@ export default function Layout() {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-          🎵 Musical Game
+           Afina si puedes
         </Link>
         <nav>
           {status === 'authenticated' ? (
