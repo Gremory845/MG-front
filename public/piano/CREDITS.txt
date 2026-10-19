@@ -1,0 +1,7 @@
+Muestras de piano: "Salamander Grand Piano V3" por Alexander Holm
+Licencia: Creative Commons Attribution 3.0 (CC BY 3.0) - https://creativecommons.org/licenses/by/3.0/
+Fuente original: https://archive.org/details/SalamanderGrandPianoV3
+Copias usadas: repositorio de audio de Tone.js (https://github.com/Tonejs/audio)
+
+Cambios: se seleccionaron 8 notas (La3 a Fa#5), se recortaron a 3,2 segundos con desvanecimiento
+final y se recodificaron a MP3 mono de 96 kbps.

@@ -8,7 +8,7 @@ export default function Layout() {
     <div className="app">
       <header className="topbar">
         <Link to="/" className="brand">
-           Afina si puedes
+          🎵 Musical Game
         </Link>
         <nav>
           {status === 'authenticated' ? (
@@ -29,6 +29,13 @@ export default function Layout() {
       <main className="content">
         <Outlet />
       </main>
+      <footer className="footer">
+        Sonido de piano: Salamander Grand Piano de Alexander Holm (
+        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">
+          CC BY 3.0
+        </a>
+        )
+      </footer>
     </div>
   )
 }

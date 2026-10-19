@@ -4,6 +4,7 @@ import type { AttemptResult, LevelDetail, NoteAttemptPayload } from '../api/type
 import { listenForNote } from './listenForNote'
 import type { MeterHandle } from './listenForNote'
 import { freqToPitch } from './music'
+import { loadPiano, preloadPiano } from './piano'
 import { playScale } from './scalePlayer'
 
 // Máquina de estados del juego (en vez de veinte booleanos).
@@ -109,7 +110,9 @@ export function useGame(level: LevelDetail | undefined) {
 
     // 2) Suena la escala
     setPhase('PLAYING_SCALE')
-    await playScale(ctx, level.notes, setPlayingIndex, cancelled)
+    const piano = await loadPiano(ctx) // null si no cargó: se usa el sonido de respaldo
+    if (cancelled()) return
+    await playScale(ctx, level.notes, piano, setPlayingIndex, cancelled)
     setPlayingIndex(null)
     if (cancelled()) return
 
@@ -171,6 +174,11 @@ export function useGame(level: LevelDetail | undefined) {
     setPhase('COMPLETED')
     await finish(true)
   }, [level])
+
+  // Descarga las muestras de piano apenas se abre el nivel, para que suenen al instante.
+  useEffect(() => {
+    preloadPiano().catch(() => {})
+  }, [])
 
   // Limpieza al salir de la pantalla: cancela loops y libera micrófono/audio.
   useEffect(() => {

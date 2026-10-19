@@ -3,12 +3,15 @@ import Layout from './components/Layout'
 import RequireAuth from './components/RequireAuth'
 import CategoriesPage from './pages/CategoriesPage'
 import FamiliesPage from './pages/FamiliesPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import GamePage from './pages/GamePage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import LevelsPage from './pages/LevelsPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ScalesPage from './pages/ScalesPage'
+import VerifyCodePage from './pages/VerifyCodePage'
 
 export default function App() {
   return (
@@ -16,6 +19,9 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/forgot-password/verify" element={<VerifyCodePage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route element={<RequireAuth />}>
           <Route path="/" element={<CategoriesPage />} />

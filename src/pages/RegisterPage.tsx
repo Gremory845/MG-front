@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import PasswordInput from '../components/PasswordInput'
 
 export default function RegisterPage() {
   const { register } = useAuth()
@@ -17,7 +18,7 @@ export default function RegisterPage() {
     setBusy(true)
     setError(null)
     try {
-      await register(email, username, password)
+      await register(email, username.trim(), password)
       navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado')
@@ -39,7 +40,7 @@ export default function RegisterPage() {
       </label>
       <label>
         Contraseña (mínimo 8)
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} autoComplete="new-password" required />
       </label>
       {error && <p className="error">{error}</p>}
       <button className="btn" disabled={busy}>

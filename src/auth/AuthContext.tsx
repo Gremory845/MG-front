@@ -7,7 +7,7 @@ type Status = 'loading' | 'authenticated' | 'anonymous'
 
 interface AuthValue {
   status: Status
-  login: (email: string, password: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void>
   register: (email: string, username: string, password: string) => Promise<void>
   logout: () => void
 }
@@ -30,15 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setSessionExpiredHandler(null)
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    await api.login(email, password)
+  const login = useCallback(async (username: string, password: string) => {
+    await api.login(username, password)
     setStatus('authenticated')
   }, [])
 
   const register = useCallback(
     async (email: string, username: string, password: string) => {
       await api.register(email, username, password)
-      await login(email, password)
+      await login(username, password)
     },
     [login],
   )
