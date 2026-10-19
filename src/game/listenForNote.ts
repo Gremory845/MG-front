@@ -12,8 +12,8 @@ const WRONG_MS = 1000 // cuánto sostener una nota incorrecta para fallar
 const TIMEOUT_MS = 9000 // sin acertar en este tiempo = fallo
 
 // Filtros contra ruido (carros, motos, etc.)
-const CLARITY_MIN = 0.93 // confianza mínima del detector (sube = más estricto)
-const RMS_MIN = 0.015 // volumen mínimo (sube = ignora sonidos más suaves)
+const CLARITY_MIN = 0.85 // confianza mínima del detector (sube = más estricto)
+const RMS_MIN = 0.005 // volumen mínimo (sube = ignora sonidos más suaves)
 const STABLE_FRAMES = 4 // el tono debe mantenerse estable este número de lecturas seguidas...
 const STABLE_CENTS = 80 // ...sin variar más de estos cents entre lecturas
 const FREQ_MIN = 70
